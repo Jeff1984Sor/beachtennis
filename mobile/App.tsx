@@ -107,6 +107,8 @@ export default function App() {
   const [aulas, setAulas] = useState<Aula[]>([]);
   const [weekStart, setWeekStart] = useState<Date>(startOfWeek(new Date()));
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [conflictIds, setConflictIds] = useState<Record<string, boolean>>({});
+  const [snapMinutes, setSnapMinutes] = useState(15);
   const dragY = useRef(new Animated.Value(0)).current;
   const dragX = useRef(new Animated.Value(0)).current;
 
@@ -237,12 +239,18 @@ export default function App() {
 
     if (!res.ok) {
       setError("Erro ao reagendar aula");
+      setConflictIds((prev) => ({ ...prev, [aula.id]: true }));
       return;
     }
 
     const updated = (await res.json()) as Aula;
     const next = aulas.map((item) => (item.id === updated.id ? updated : item));
     setAulas(next);
+    setConflictIds((prev) => {
+      const copy = { ...prev };
+      delete copy[aula.id];
+      return copy;
+    });
     await saveWeekCache(weekStart, next);
   };
 
@@ -259,10 +267,12 @@ export default function App() {
         dragX.setValue(gesture.dx);
       },
       onPanResponderRelease: (_, gesture) => {
-        const minutesDelta = Math.round((gesture.dy * MINUTES_PER_PIXEL) / 15) * 15;
+        const minutesDelta = Math.round((gesture.dy * MINUTES_PER_PIXEL) / snapMinutes) * snapMinutes;
         const daysDelta = Math.round(gesture.dx / DAY_COL_WIDTH);
         const inicioAtual = new Date(aula.inicio);
-        const novoInicio = new Date(inicioAtual.getTime() + minutesDelta * 60000 + daysDelta * 86400000);
+        const novoInicio = new Date(
+          inicioAtual.getTime() + minutesDelta * 60000 + daysDelta * 86400000
+        );
         dragY.setValue(0);
         dragX.setValue(0);
         setDraggingId(null);
@@ -320,6 +330,17 @@ export default function App() {
             <Text style={styles.buttonText}>?</Text>
           </TouchableOpacity>
         </View>
+        <View style={styles.snapRow}>
+          {[5, 10, 15].map((value) => (
+            <TouchableOpacity
+              key={value}
+              style={[styles.snapButton, snapMinutes === value && styles.snapActive]}
+              onPress={() => setSnapMinutes(value)}
+            >
+              <Text style={styles.snapText}>{value}m</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
         <TouchableOpacity style={styles.button} onPress={() => carregarSemana(weekStart)}>
           <Text style={styles.buttonText}>Atualizar</Text>
         </TouchableOpacity>
@@ -350,13 +371,15 @@ export default function App() {
                   {aulasDoDia(dayIdx).map((aula) => {
                     const responder = createPanResponder(aula);
                     const isDragging = draggingId === aula.id;
+                    const isConflict = !!conflictIds[aula.id];
                     return (
                       <Animated.View
                         key={aula.id}
                         style={[
                           styles.aulaBlock,
                           { top: aula.top, height: aula.height },
-                          isDragging && { transform: [{ translateY: dragY }, { translateX: dragX }] }
+                          isDragging && { transform: [{ translateY: dragY }, { translateX: dragX }] },
+                          isConflict && styles.aulaConflict
                         ]}
                         {...responder.panHandlers}
                       >
@@ -446,6 +469,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 8
   },
+  snapRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 8
+  },
+  snapButton: {
+    backgroundColor: "#f0d5b1",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8
+  },
+  snapActive: {
+    backgroundColor: "#0b5563"
+  },
+  snapText: {
+    color: "#1c1b19",
+    fontWeight: "600"
+  },
   gridHeader: {
     flexDirection: "row",
     paddingBottom: 6,
@@ -492,6 +533,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffe3c2",
     borderRadius: 8,
     padding: 4
+  },
+  aulaConflict: {
+    backgroundColor: "#ffd1d1",
+    borderWidth: 1,
+    borderColor: "#c44536"
   },
   aulaText: {
     fontSize: 12,

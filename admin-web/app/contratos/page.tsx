@@ -43,6 +43,7 @@ export default function ContratosPage() {
   const [selectedContrato, setSelectedContrato] = useState<Contrato | null>(null);
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
+  const [activeIndex, setActiveIndex] = useState(0);
 
   const fetchContratos = async (value: string) => {
     const token = getToken();
@@ -56,6 +57,7 @@ export default function ContratosPage() {
     if (!res.ok) return;
     const data = (await res.json()) as Contrato[];
     setContratos(data);
+    setActiveIndex(0);
   };
 
   useEffect(() => {
@@ -114,6 +116,23 @@ export default function ContratosPage() {
 
   const results = useMemo(() => contratos.slice(0, 10), [contratos]);
 
+  const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!results.length) return;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActiveIndex((prev) => Math.min(prev + 1, results.length - 1));
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveIndex((prev) => Math.max(prev - 1, 0));
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const target = results[activeIndex];
+      if (target) selectContrato(target.id);
+    }
+  };
+
   return (
     <div className="grid grid-2">
       <div className="card">
@@ -124,6 +143,7 @@ export default function ContratosPage() {
           className="input"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
+          onKeyDown={onKeyDown}
           placeholder="Nome do aluno ou ID"
         />
         {search && (
@@ -131,10 +151,13 @@ export default function ContratosPage() {
             {results.length === 0 ? (
               <p>Nenhum resultado.</p>
             ) : (
-              results.map((contrato) => (
+              results.map((contrato, idx) => (
                 <button
                   key={contrato.id}
                   className="button"
+                  style={{
+                    outline: idx === activeIndex ? "2px solid #0b5563" : "none"
+                  }}
                   onClick={() => selectContrato(contrato.id)}
                   dangerouslySetInnerHTML={{
                     __html: highlight(
