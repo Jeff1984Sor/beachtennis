@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -7,8 +8,18 @@ from app.core.deps import get_current_user
 from app.core.errors import api_error
 from app.schemas.contrato import ContratoOut, ContratoCreate, ContratoUpdate
 from app.models.contrato import Contrato
+from app.services.contrato_template_service import render_template, default_context
 
 router = APIRouter(prefix="/contratos")
+
+
+class PreviewRequest(BaseModel):
+    content_html: str
+    data: dict | None = None
+
+
+class PreviewResponse(BaseModel):
+    rendered_html: str
 
 
 @router.get("", response_model=list[ContratoOut])
@@ -64,3 +75,12 @@ async def remover(
     await session.delete(contrato)
     await session.commit()
     return {"status": "deleted"}
+
+
+@router.post("/preview", response_model=PreviewResponse)
+async def preview(payload: PreviewRequest, user=Depends(get_current_user)) -> PreviewResponse:
+    context = default_context()
+    if payload.data:
+        context.update(payload.data)
+    rendered = render_template(payload.content_html, context)
+    return PreviewResponse(rendered_html=rendered)

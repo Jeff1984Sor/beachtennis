@@ -14,12 +14,20 @@ type TokenPair = {
   refresh_token: string;
 };
 
+type Aula = {
+  id: string;
+  inicio: string;
+  fim: string;
+  status: string;
+};
+
 export default function App() {
   const [branding, setBranding] = useState<Branding | null>(null);
   const [email, setEmail] = useState("admin@local");
   const [password, setPassword] = useState("admin123");
   const [token, setToken] = useState<TokenPair | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [aulas, setAulas] = useState<Aula[]>([]);
 
   useEffect(() => {
     fetch("http://localhost:8000/public/branding")
@@ -45,6 +53,26 @@ export default function App() {
     } catch (err) {
       setError("Falha ao conectar na API");
     }
+  };
+
+  const carregarAgendaHoje = async () => {
+    if (!token) return;
+    const hoje = new Date();
+    const inicio = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 0, 0, 0);
+    const fim = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 23, 59, 59);
+
+    const res = await fetch(
+      `http://localhost:8000/agenda/aulas?inicio=${inicio.toISOString()}&fim=${fim.toISOString()}`,
+      {
+        headers: { Authorization: `Bearer ${token.access_token}` }
+      }
+    );
+    if (!res.ok) {
+      setError("Erro ao carregar agenda");
+      return;
+    }
+    const data = (await res.json()) as Aula[];
+    setAulas(data);
   };
 
   return (
@@ -73,6 +101,20 @@ export default function App() {
         </TouchableOpacity>
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {token ? <Text>Token recebido ?</Text> : null}
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Agenda de hoje</Text>
+        <TouchableOpacity style={styles.button} onPress={carregarAgendaHoje}>
+          <Text style={styles.buttonText}>Atualizar</Text>
+        </TouchableOpacity>
+        {aulas.length === 0 ? <Text>Nenhuma aula encontrada.</Text> : null}
+        {aulas.map((aula) => (
+          <View key={aula.id} style={styles.aulaItem}>
+            <Text>{new Date(aula.inicio).toLocaleTimeString()}</Text>
+            <Text>{aula.status}</Text>
+          </View>
+        ))}
       </View>
 
       <View style={styles.card}>
@@ -132,5 +174,10 @@ const styles = StyleSheet.create({
   },
   error: {
     color: "#c44536"
+  },
+  aulaItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 6
   }
 });

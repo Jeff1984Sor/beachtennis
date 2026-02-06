@@ -101,5 +101,17 @@ class AulaCreate(AulaBase):
     pass
 
 
+class AulaUpdate(BaseModel):
+    agenda_id: UUID | None = None
+    unidade_id: UUID | None = None
+    aluno_id: UUID | None = None
+    profissional_id: UUID | None = None
+    inicio: datetime | None = None
+    fim: datetime | None = None
+    status: AulaStatus | None = None
+    origem: AulaOrigem | None = None
+    observacoes: str | None = None
+
+
 class AulaOut(UUIDModel, Timestamped, AulaBase):
     pass

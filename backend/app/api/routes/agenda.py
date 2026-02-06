@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -17,12 +19,13 @@ from app.schemas.agenda import (
     BloqueioAgendaCreate,
     AulaOut,
     AulaCreate,
+    AulaUpdate,
 )
 from app.models.agenda import Agenda
 from app.models.disponibilidade_agenda import DisponibilidadeAgenda
 from app.models.disponibilidade_unidade_override import DisponibilidadeUnidadeOverride
 from app.models.bloqueio_agenda import BloqueioAgenda
-from app.services.aula_service import criar_aula, listar_aulas
+from app.services.aula_service import criar_aula, listar_aulas, atualizar_aula, cancelar_aula
 
 router = APIRouter(prefix="/agenda")
 
@@ -109,10 +112,18 @@ async def criar_bloqueio(
 @router.get("/aulas", response_model=list[AulaOut])
 async def listar_aulas_endpoint(
     agenda_id: str | None = None,
+    inicio: str | None = None,
+    fim: str | None = None,
     session: AsyncSession = Depends(get_session),
     user=Depends(get_current_user),
 ):
-    aulas = await listar_aulas(session, agenda_id)
+    inicio_dt = None
+    fim_dt = None
+    if inicio:
+        inicio_dt = datetime.fromisoformat(inicio)
+    if fim:
+        fim_dt = datetime.fromisoformat(fim)
+    aulas = await listar_aulas(session, agenda_id, inicio_dt, fim_dt)
     return [AulaOut.model_validate(a) for a in aulas]
 
 
@@ -123,4 +134,25 @@ async def criar_aula_endpoint(
     user=Depends(get_current_user),
 ):
     aula = await criar_aula(session, payload.model_dump())
+    return AulaOut.model_validate(aula)
+
+
+@router.put("/aulas/{aula_id}", response_model=AulaOut)
+async def atualizar_aula_endpoint(
+    aula_id: str,
+    payload: AulaUpdate,
+    session: AsyncSession = Depends(get_session),
+    user=Depends(get_current_user),
+):
+    aula = await atualizar_aula(session, aula_id, payload.model_dump(exclude_unset=True))
+    return AulaOut.model_validate(aula)
+
+
+@router.post("/aulas/{aula_id}/cancelar", response_model=AulaOut)
+async def cancelar_aula_endpoint(
+    aula_id: str,
+    session: AsyncSession = Depends(get_session),
+    user=Depends(get_current_user),
+):
+    aula = await cancelar_aula(session, aula_id)
     return AulaOut.model_validate(aula)

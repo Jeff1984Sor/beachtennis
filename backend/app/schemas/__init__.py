@@ -20,6 +20,7 @@ from app.schemas.agenda import (
     BloqueioAgendaCreate,
     AulaOut,
     AulaCreate,
+    AulaUpdate,
 )
 
 __all__ = [
@@ -60,4 +61,5 @@ __all__ = [
     "BloqueioAgendaCreate",
     "AulaOut",
     "AulaCreate",
+    "AulaUpdate",
 ]
