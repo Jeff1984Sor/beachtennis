@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { getToken } from "../lib/auth";
 
 type Branding = {
   nome_empresa: string;
@@ -10,15 +12,20 @@ type Branding = {
 };
 
 export default function BrandingPage() {
+  const router = useRouter();
   const [branding, setBranding] = useState<Branding | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    if (!getToken()) {
+      router.push("/login");
+      return;
+    }
     fetch("http://localhost:8000/public/branding")
       .then((res) => res.json())
       .then((data) => setBranding(data))
       .catch(() => setBranding(null));
-  }, []);
+  }, [router]);
 
   const updateField = (key: keyof Branding, value: string) => {
     if (!branding) return;
@@ -28,9 +35,10 @@ export default function BrandingPage() {
   const handleSave = async () => {
     if (!branding) return;
     setSaving(true);
+    const token = getToken();
     await fetch("http://localhost:8000/config/branding", {
       method: "PUT",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer TOKEN" },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({
         nome_empresa: branding.nome_empresa,
         fonte: branding.fonte,

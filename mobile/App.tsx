@@ -1,12 +1,11 @@
-import { StatusBar } from "expo-status-bar";
+"use client";
+
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, View, TextInput, TouchableOpacity } from "react-native";
+import { StatusBar } from "expo-status-bar";
 
 type Branding = {
   nome_empresa: string;
-  tema?: Record<string, string> | null;
-  fonte?: string | null;
-  logo_url?: string | null;
 };
 
 type TokenPair = {
@@ -21,6 +20,20 @@ type Aula = {
   status: string;
 };
 
+const diasSemana = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
+
+const startOfWeek = (date: Date) => {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(d.setDate(diff));
+};
+
+const formatDate = (date: Date) =>
+  `${date.getDate().toString().padStart(2, "0")}/${(date.getMonth() + 1)
+    .toString()
+    .padStart(2, "0")}`;
+
 export default function App() {
   const [branding, setBranding] = useState<Branding | null>(null);
   const [email, setEmail] = useState("admin@local");
@@ -28,6 +41,7 @@ export default function App() {
   const [token, setToken] = useState<TokenPair | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [aulas, setAulas] = useState<Aula[]>([]);
+  const [weekStart, setWeekStart] = useState<Date>(startOfWeek(new Date()));
 
   useEffect(() => {
     fetch("http://localhost:8000/public/branding")
@@ -55,11 +69,12 @@ export default function App() {
     }
   };
 
-  const carregarAgendaHoje = async () => {
+  const carregarSemana = async (baseDate: Date) => {
     if (!token) return;
-    const hoje = new Date();
-    const inicio = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 0, 0, 0);
-    const fim = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 23, 59, 59);
+    const inicio = new Date(baseDate);
+    const fim = new Date(baseDate);
+    fim.setDate(fim.getDate() + 6);
+    fim.setHours(23, 59, 59, 999);
 
     const res = await fetch(
       `http://localhost:8000/agenda/aulas?inicio=${inicio.toISOString()}&fim=${fim.toISOString()}`,
@@ -74,6 +89,16 @@ export default function App() {
     const data = (await res.json()) as Aula[];
     setAulas(data);
   };
+
+  const changeWeek = (delta: number) => {
+    const next = new Date(weekStart);
+    next.setDate(next.getDate() + delta * 7);
+    setWeekStart(next);
+    carregarSemana(next);
+  };
+
+  const aulasPorDia = (dayIndex: number) =>
+    aulas.filter((aula) => new Date(aula.inicio).getDay() === dayIndex);
 
   return (
     <View style={styles.container}>
@@ -100,27 +125,40 @@ export default function App() {
           <Text style={styles.buttonText}>Entrar</Text>
         </TouchableOpacity>
         {error ? <Text style={styles.error}>{error}</Text> : null}
-        {token ? <Text>Token recebido ?</Text> : null}
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Agenda de hoje</Text>
-        <TouchableOpacity style={styles.button} onPress={carregarAgendaHoje}>
+        <Text style={styles.cardTitle}>Agenda semanal</Text>
+        <View style={styles.weekHeader}>
+          <TouchableOpacity style={styles.buttonSmall} onPress={() => changeWeek(-1)}>
+            <Text style={styles.buttonText}>?</Text>
+          </TouchableOpacity>
+          <Text>{formatDate(weekStart)} - {formatDate(new Date(weekStart.getTime() + 6 * 86400000))}</Text>
+          <TouchableOpacity style={styles.buttonSmall} onPress={() => changeWeek(1)}>
+            <Text style={styles.buttonText}>?</Text>
+          </TouchableOpacity>
+        </View>
+        <TouchableOpacity style={styles.button} onPress={() => carregarSemana(weekStart)}>
           <Text style={styles.buttonText}>Atualizar</Text>
         </TouchableOpacity>
-        {aulas.length === 0 ? <Text>Nenhuma aula encontrada.</Text> : null}
-        {aulas.map((aula) => (
-          <View key={aula.id} style={styles.aulaItem}>
-            <Text>{new Date(aula.inicio).toLocaleTimeString()}</Text>
-            <Text>{aula.status}</Text>
+
+        {diasSemana.map((dia, idx) => (
+          <View key={dia} style={styles.dayBlock}>
+            <Text style={styles.dayTitle}>{dia}</Text>
+            {aulasPorDia(idx).length === 0 ? (
+              <Text style={styles.muted}>Sem aulas</Text>
+            ) : (
+              aulasPorDia(idx).map((aula) => (
+                <View key={aula.id} style={styles.aulaItem}>
+                  <Text>{new Date(aula.inicio).toLocaleTimeString()}</Text>
+                  <Text>{aula.status}</Text>
+                </View>
+              ))
+            )}
           </View>
         ))}
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Ficha do aluno</Text>
-        <Text>Aulas · Financeiro · WhatsApp · Contrato · Anexos</Text>
-      </View>
       <StatusBar style="dark" />
     </View>
   );
@@ -168,6 +206,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 8
   },
+  buttonSmall: {
+    backgroundColor: "#ff7a00",
+    borderRadius: 8,
+    padding: 6,
+    alignItems: "center"
+  },
   buttonText: {
     color: "white",
     fontWeight: "600"
@@ -175,9 +219,28 @@ const styles = StyleSheet.create({
   error: {
     color: "#c44536"
   },
+  weekHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8
+  },
+  dayBlock: {
+    marginTop: 8,
+    padding: 8,
+    backgroundColor: "#fffdf8",
+    borderRadius: 10
+  },
+  dayTitle: {
+    fontWeight: "600",
+    marginBottom: 4
+  },
   aulaItem: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 6
+    paddingVertical: 4
+  },
+  muted: {
+    color: "#6b6a65"
   }
 });

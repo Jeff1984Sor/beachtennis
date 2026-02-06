@@ -1,4 +1,4 @@
-from datetime import time, datetime, date
+from datetime import date, datetime, time
 from uuid import UUID
 
 from pydantic import BaseModel

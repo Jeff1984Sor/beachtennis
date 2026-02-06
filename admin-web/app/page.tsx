@@ -1,6 +1,24 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { clearToken, getToken } from "./lib/auth";
+import { useEffect } from "react";
 
 export default function HomePage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!getToken()) {
+      router.push("/login");
+    }
+  }, [router]);
+
+  const logout = () => {
+    clearToken();
+    router.push("/login");
+  };
+
   return (
     <div className="grid">
       <header className="header">
@@ -9,6 +27,9 @@ export default function HomePage() {
           <Link href="/branding">Branding</Link>
           <Link href="/comissoes">Comissões</Link>
           <Link href="/contratos">Contratos</Link>
+          <button className="button" onClick={logout}>
+            Sair
+          </button>
         </nav>
       </header>
 

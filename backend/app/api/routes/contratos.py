@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.database import get_session
@@ -8,7 +9,7 @@ from app.core.deps import get_current_user
 from app.core.errors import api_error
 from app.schemas.contrato import ContratoOut, ContratoCreate, ContratoUpdate
 from app.models.contrato import Contrato
-from app.services.contrato_template_service import render_template, default_context
+from app.services.contrato_template_service import render_template, build_context
 
 router = APIRouter(prefix="/contratos")
 
@@ -16,6 +17,10 @@ router = APIRouter(prefix="/contratos")
 class PreviewRequest(BaseModel):
     content_html: str
     data: dict | None = None
+    contrato_id: str | None = None
+    aluno_id: str | None = None
+    unidade_id: str | None = None
+    plano_id: str | None = None
 
 
 class PreviewResponse(BaseModel):
@@ -78,8 +83,18 @@ async def remover(
 
 
 @router.post("/preview", response_model=PreviewResponse)
-async def preview(payload: PreviewRequest, user=Depends(get_current_user)) -> PreviewResponse:
-    context = default_context()
+async def preview(
+    payload: PreviewRequest,
+    session: AsyncSession = Depends(get_session),
+    user=Depends(get_current_user),
+) -> PreviewResponse:
+    context = await build_context(
+        session=session,
+        contrato_id=payload.contrato_id,
+        aluno_id=payload.aluno_id,
+        unidade_id=payload.unidade_id,
+        plano_id=payload.plano_id,
+    )
     if payload.data:
         context.update(payload.data)
     rendered = render_template(payload.content_html, context)
