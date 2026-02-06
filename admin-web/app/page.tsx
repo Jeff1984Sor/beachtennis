@@ -1,8 +1,8 @@
-"use client";
+Ôªø"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { clearToken, getToken } from "./lib/auth";
+import { getToken } from "./lib/auth";
 import { useEffect } from "react";
 
 export default function HomePage() {
@@ -14,26 +14,17 @@ export default function HomePage() {
     }
   }, [router]);
 
-  const logout = () => {
-    clearToken();
-    router.push("/login");
-  };
-
   return (
     <div className="grid">
-      <header className="header">
-        <div className="logo">Beach Tennis Admin</div>
-        <nav className="nav">
-          <Link href="/branding">Branding</Link>
-          <Link href="/comissoes">Comissıes</Link>
-          <Link href="/contratos">Contratos</Link>
-          <button className="button" onClick={logout}>
-            Sair
-          </button>
-        </nav>
-      </header>
-
       <section className="grid grid-2">
+        <div className="card">
+          <div className="label">Cadastros</div>
+          <h2>Todas as tabelas</h2>
+          <p>
+            Crie, edite e organize todos os registros com formul√°rio em modal.
+          </p>
+          <Link href="/cadastros">Abrir cadastros</Link>
+        </div>
         <div className="card">
           <div className="label">Branding</div>
           <h2>Identidade visual centralizada</h2>
@@ -44,13 +35,19 @@ export default function HomePage() {
           <Link href="/branding">Abrir editor</Link>
         </div>
         <div className="card">
-          <div className="label">Comissıes</div>
+          <div className="label">Comiss√µes</div>
           <h2>Regras inteligentes por unidade</h2>
           <p>
-            Configure o dia de pagamento e gere comissıes do mÍs anterior com
+            Configure o dia de pagamento e gere comiss√µes do m√™s anterior com
             um clique.
           </p>
           <Link href="/comissoes">Configurar</Link>
+        </div>
+        <div className="card">
+          <div className="label">Contratos</div>
+          <h2>Templates com vari√°veis</h2>
+          <p>Edite, teste e pr√©-visualize contratos reais.</p>
+          <Link href="/contratos">Abrir contratos</Link>
         </div>
       </section>
     </div>

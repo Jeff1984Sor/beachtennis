@@ -1,8 +1,9 @@
-"use client";
+ï»¿"use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getToken } from "../lib/auth";
+import { apiFetch } from "../lib/api";
 
 type Branding = {
   nome_empresa: string;
@@ -21,7 +22,7 @@ export default function BrandingPage() {
       router.push("/login");
       return;
     }
-    fetch("http://localhost:8000/public/branding")
+    apiFetch("/public/branding", { auth: false })
       .then((res) => res.json())
       .then((data) => setBranding(data))
       .catch(() => setBranding(null));
@@ -36,7 +37,7 @@ export default function BrandingPage() {
     if (!branding) return;
     setSaving(true);
     const token = getToken();
-    await fetch("http://localhost:8000/config/branding", {
+    await apiFetch("/config/branding", {
       method: "PUT",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({
@@ -56,7 +57,7 @@ export default function BrandingPage() {
 
       <div className="grid grid-2">
         <div className="card">
-          <div className="label">Configuração</div>
+          <div className="label">ConfiguraÃ§Ã£o</div>
           <label className="label">Nome da empresa</label>
           <input
             className="input"

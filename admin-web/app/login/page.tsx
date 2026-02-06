@@ -1,8 +1,9 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { setToken } from "../lib/auth";
+import { API_BASE } from "../lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,13 +13,13 @@ export default function LoginPage() {
 
   const handleLogin = async () => {
     setError(null);
-    const res = await fetch("http://localhost:8000/auth/login", {
+    const res = await fetch(`${API_BASE}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password })
     });
     if (!res.ok) {
-      setError("Credenciais inv�lidas");
+      setError("Credenciais inválidas");
       return;
     }
     const data = await res.json();

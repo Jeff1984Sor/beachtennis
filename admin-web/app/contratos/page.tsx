@@ -1,10 +1,11 @@
-"use client";
+Ôªø"use client";
 
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getToken } from "../lib/auth";
+import { apiFetch } from "../lib/api";
 
 type Contrato = {
   id: string;
@@ -36,7 +37,7 @@ export default function ContratosPage() {
   const router = useRouter();
   const editor = useEditor({
     extensions: [StarterKit],
-    content: "<h2>Modelo de Contrato</h2><p>Edite o texto e use as vari·veis.</p>"
+    content: "<h2>Modelo de Contrato</h2><p>Edite o texto e use as vari√°veis.</p>"
   });
   const [previewHtml, setPreviewHtml] = useState<string>("");
   const [contratos, setContratos] = useState<Contrato[]>([]);
@@ -49,11 +50,9 @@ export default function ContratosPage() {
     const token = getToken();
     if (!token) return;
     const url = value
-      ? `http://localhost:8000/contratos?search=${encodeURIComponent(value)}`
-      : "http://localhost:8000/contratos";
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+      ? `/contratos?search=${encodeURIComponent(value)}`
+      : "/contratos";
+    const res = await apiFetch(url);
     if (!res.ok) return;
     const data = (await res.json()) as Contrato[];
     setContratos(data);
@@ -87,9 +86,7 @@ export default function ContratosPage() {
   const selectContrato = async (id: string) => {
     const token = getToken();
     if (!token) return;
-    const res = await fetch(`http://localhost:8000/contratos/${id}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    const res = await apiFetch(`/contratos/${id}`);
     if (!res.ok) return;
     const data = (await res.json()) as Contrato;
     const match = contratos.find((item) => item.id === id);
@@ -99,7 +96,7 @@ export default function ContratosPage() {
   const renderPreview = async () => {
     const html = editor?.getHTML() || "";
     const token = getToken();
-    const res = await fetch("http://localhost:8000/contratos/preview", {
+    const res = await apiFetch("/contratos/preview", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({
@@ -191,7 +188,7 @@ export default function ContratosPage() {
         </button>
       </div>
       <div className="card">
-        <div className="label">Vari·veis</div>
+        <div className="label">Vari√°veis</div>
         <p>Clique para inserir no template:</p>
         <div className="grid">
           {variaveis.map((item) => (

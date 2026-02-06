@@ -1,4 +1,5 @@
 import "./globals.css";
+import TopNav from "./components/top-nav";
 
 export const metadata = {
   title: "Beach Tennis Admin",
@@ -13,6 +14,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body>
+        <TopNav />
         <main>{children}</main>
       </body>
     </html>
