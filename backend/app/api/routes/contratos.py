@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.database import get_session
@@ -34,6 +33,19 @@ async def listar(
 ) -> list[ContratoOut]:
     result = await session.execute(select(Contrato))
     return [ContratoOut.model_validate(c) for c in result.scalars()]
+
+
+@router.get("/{contrato_id}", response_model=ContratoOut)
+async def obter(
+    contrato_id: str,
+    session: AsyncSession = Depends(get_session),
+    user=Depends(get_current_user),
+) -> ContratoOut:
+    result = await session.execute(select(Contrato).where(Contrato.id == contrato_id))
+    contrato = result.scalar_one_or_none()
+    if not contrato:
+        raise api_error("not_found", "Contrato nao encontrado", 404)
+    return ContratoOut.model_validate(contrato)
 
 
 @router.post("", response_model=ContratoOut)

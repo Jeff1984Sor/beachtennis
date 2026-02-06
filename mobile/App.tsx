@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { StyleSheet, Text, View, TextInput, TouchableOpacity } from "react-native";
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type Branding = {
   nome_empresa: string;
@@ -21,6 +22,8 @@ type Aula = {
 };
 
 const diasSemana = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
+const horas = Array.from({ length: 16 }, (_, i) => 6 + i);
+const TOKEN_KEY = "bt_mobile_token";
 
 const startOfWeek = (date: Date) => {
   const d = new Date(date);
@@ -33,6 +36,19 @@ const formatDate = (date: Date) =>
   `${date.getDate().toString().padStart(2, "0")}/${(date.getMonth() + 1)
     .toString()
     .padStart(2, "0")}`;
+
+const loadToken = async () => {
+  const raw = await AsyncStorage.getItem(TOKEN_KEY);
+  return raw ? (JSON.parse(raw) as TokenPair) : null;
+};
+
+const saveToken = async (token: TokenPair) => {
+  await AsyncStorage.setItem(TOKEN_KEY, JSON.stringify(token));
+};
+
+const clearToken = async () => {
+  await AsyncStorage.removeItem(TOKEN_KEY);
+};
 
 export default function App() {
   const [branding, setBranding] = useState<Branding | null>(null);
@@ -50,6 +66,12 @@ export default function App() {
       .catch(() => setBranding(null));
   }, []);
 
+  useEffect(() => {
+    loadToken().then((stored) => {
+      if (stored) setToken(stored);
+    });
+  }, []);
+
   const handleLogin = async () => {
     setError(null);
     try {
@@ -64,9 +86,26 @@ export default function App() {
       }
       const data = (await res.json()) as TokenPair;
       setToken(data);
+      await saveToken(data);
     } catch (err) {
       setError("Falha ao conectar na API");
     }
+  };
+
+  const refreshToken = async (): Promise<TokenPair | null> => {
+    if (!token) return null;
+    const res = await fetch("http://localhost:8000/auth/refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: token.refresh_token })
+    });
+    if (!res.ok) {
+      return null;
+    }
+    const data = (await res.json()) as TokenPair;
+    setToken(data);
+    await saveToken(data);
+    return data;
   };
 
   const carregarSemana = async (baseDate: Date) => {
@@ -76,12 +115,22 @@ export default function App() {
     fim.setDate(fim.getDate() + 6);
     fim.setHours(23, 59, 59, 999);
 
-    const res = await fetch(
-      `http://localhost:8000/agenda/aulas?inicio=${inicio.toISOString()}&fim=${fim.toISOString()}`,
-      {
-        headers: { Authorization: `Bearer ${token.access_token}` }
+    const callApi = async (accessToken: string) =>
+      fetch(
+        `http://localhost:8000/agenda/aulas?inicio=${inicio.toISOString()}&fim=${fim.toISOString()}`,
+        {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        }
+      );
+
+    let res = await callApi(token.access_token);
+    if (res.status === 401) {
+      const refreshed = await refreshToken();
+      if (refreshed) {
+        res = await callApi(refreshed.access_token);
       }
-    );
+    }
+
     if (!res.ok) {
       setError("Erro ao carregar agenda");
       return;
@@ -100,8 +149,16 @@ export default function App() {
   const aulasPorDia = (dayIndex: number) =>
     aulas.filter((aula) => new Date(aula.inicio).getDay() === dayIndex);
 
+  const aulasPorDiaHora = (dayIndex: number, hour: number) =>
+    aulasPorDia(dayIndex).filter((aula) => new Date(aula.inicio).getHours() === hour);
+
+  const logout = async () => {
+    setToken(null);
+    await clearToken();
+  };
+
   return (
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>{branding?.nome_empresa || "Beach Tennis"}</Text>
       <Text style={styles.subtitle}>Login e operações do dia a dia</Text>
 
@@ -124,6 +181,11 @@ export default function App() {
         <TouchableOpacity style={styles.button} onPress={handleLogin}>
           <Text style={styles.buttonText}>Entrar</Text>
         </TouchableOpacity>
+        {token ? (
+          <TouchableOpacity style={styles.buttonSecondary} onPress={logout}>
+            <Text style={styles.buttonText}>Sair</Text>
+          </TouchableOpacity>
+        ) : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
       </View>
 
@@ -133,7 +195,9 @@ export default function App() {
           <TouchableOpacity style={styles.buttonSmall} onPress={() => changeWeek(-1)}>
             <Text style={styles.buttonText}>?</Text>
           </TouchableOpacity>
-          <Text>{formatDate(weekStart)} - {formatDate(new Date(weekStart.getTime() + 6 * 86400000))}</Text>
+          <Text>
+            {formatDate(weekStart)} - {formatDate(new Date(weekStart.getTime() + 6 * 86400000))}
+          </Text>
           <TouchableOpacity style={styles.buttonSmall} onPress={() => changeWeek(1)}>
             <Text style={styles.buttonText}>?</Text>
           </TouchableOpacity>
@@ -142,34 +206,49 @@ export default function App() {
           <Text style={styles.buttonText}>Atualizar</Text>
         </TouchableOpacity>
 
-        {diasSemana.map((dia, idx) => (
-          <View key={dia} style={styles.dayBlock}>
-            <Text style={styles.dayTitle}>{dia}</Text>
-            {aulasPorDia(idx).length === 0 ? (
-              <Text style={styles.muted}>Sem aulas</Text>
-            ) : (
-              aulasPorDia(idx).map((aula) => (
-                <View key={aula.id} style={styles.aulaItem}>
-                  <Text>{new Date(aula.inicio).toLocaleTimeString()}</Text>
-                  <Text>{aula.status}</Text>
+        <View style={styles.gridHeader}>
+          <View style={styles.timeCell} />
+          {diasSemana.map((dia) => (
+            <View key={dia} style={styles.dayHeaderCell}>
+              <Text style={styles.dayTitle}>{dia}</Text>
+            </View>
+          ))}
+        </View>
+        {horas.map((hour) => (
+          <View key={hour} style={styles.gridRow}>
+            <View style={styles.timeCell}>
+              <Text style={styles.muted}>{`${hour}:00`}</Text>
+            </View>
+            {diasSemana.map((_, dayIdx) => {
+              const itens = aulasPorDiaHora(dayIdx, hour);
+              return (
+                <View key={`${dayIdx}-${hour}`} style={styles.gridCell}>
+                  {itens.length === 0 ? (
+                    <Text style={styles.muted}>-</Text>
+                  ) : (
+                    itens.map((aula) => (
+                      <Text key={aula.id} style={styles.gridItem}>
+                        {aula.status}
+                      </Text>
+                    ))
+                  )}
                 </View>
-              ))
-            )}
+              );
+            })}
           </View>
         ))}
       </View>
 
       <StatusBar style="dark" />
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flexGrow: 1,
     backgroundColor: "#f7f3ea",
     alignItems: "center",
-    justifyContent: "center",
     padding: 24
   },
   title: {
@@ -206,6 +285,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 8
   },
+  buttonSecondary: {
+    backgroundColor: "#0b5563",
+    borderRadius: 10,
+    padding: 12,
+    alignItems: "center",
+    marginBottom: 8
+  },
   buttonSmall: {
     backgroundColor: "#ff7a00",
     borderRadius: 8,
@@ -225,20 +311,43 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 8
   },
-  dayBlock: {
-    marginTop: 8,
-    padding: 8,
-    backgroundColor: "#fffdf8",
-    borderRadius: 10
+  gridHeader: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderColor: "#e0d4c0",
+    paddingBottom: 4
+  },
+  gridRow: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderColor: "#f0e5d3",
+    paddingVertical: 2
+  },
+  timeCell: {
+    width: 54,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  dayHeaderCell: {
+    flex: 1,
+    alignItems: "center"
+  },
+  gridCell: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 6
   },
   dayTitle: {
     fontWeight: "600",
     marginBottom: 4
   },
-  aulaItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 4
+  gridItem: {
+    fontSize: 12,
+    backgroundColor: "#ffe3c2",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6
   },
   muted: {
     color: "#6b6a65"

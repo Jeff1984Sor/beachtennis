@@ -6,6 +6,13 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getToken } from "../lib/auth";
 
+type Contrato = {
+  id: string;
+  aluno_id: string;
+  unidade_id: string;
+  plano_id: string;
+};
+
 const variaveis = [
   "aluno.nome",
   "aluno.endereco.cidade",
@@ -25,19 +32,36 @@ export default function ContratosPage() {
     content: "<h2>Modelo de Contrato</h2><p>Edite o texto e use as variáveis.</p>"
   });
   const [previewHtml, setPreviewHtml] = useState<string>("");
-  const [contratoId, setContratoId] = useState("");
-  const [alunoId, setAlunoId] = useState("");
-  const [unidadeId, setUnidadeId] = useState("");
-  const [planoId, setPlanoId] = useState("");
+  const [contratos, setContratos] = useState<Contrato[]>([]);
+  const [selectedContrato, setSelectedContrato] = useState<Contrato | null>(null);
 
   useEffect(() => {
-    if (!getToken()) {
+    const token = getToken();
+    if (!token) {
       router.push("/login");
+      return;
     }
+    fetch("http://localhost:8000/contratos", {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then((res) => res.json())
+      .then((data) => setContratos(data))
+      .catch(() => setContratos([]));
   }, [router]);
 
   const insertVar = (value: string) => {
     editor?.chain().focus().insertContent(`{{ ${value} }}`).run();
+  };
+
+  const selectContrato = async (id: string) => {
+    const token = getToken();
+    if (!token) return;
+    const res = await fetch(`http://localhost:8000/contratos/${id}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) return;
+    const data = (await res.json()) as Contrato;
+    setSelectedContrato(data);
   };
 
   const renderPreview = async () => {
@@ -48,10 +72,10 @@ export default function ContratosPage() {
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({
         content_html: html,
-        contrato_id: contratoId || null,
-        aluno_id: alunoId || null,
-        unidade_id: unidadeId || null,
-        plano_id: planoId || null
+        contrato_id: selectedContrato?.id || null,
+        aluno_id: selectedContrato?.aluno_id || null,
+        unidade_id: selectedContrato?.unidade_id || null,
+        plano_id: selectedContrato?.plano_id || null
       })
     });
     const data = await res.json();
@@ -63,14 +87,19 @@ export default function ContratosPage() {
       <div className="card">
         <div className="label">Editor</div>
         <EditorContent editor={editor} />
-        <label className="label">Contrato ID</label>
-        <input className="input" value={contratoId} onChange={(e) => setContratoId(e.target.value)} />
-        <label className="label">Aluno ID</label>
-        <input className="input" value={alunoId} onChange={(e) => setAlunoId(e.target.value)} />
-        <label className="label">Unidade ID</label>
-        <input className="input" value={unidadeId} onChange={(e) => setUnidadeId(e.target.value)} />
-        <label className="label">Plano ID</label>
-        <input className="input" value={planoId} onChange={(e) => setPlanoId(e.target.value)} />
+        <label className="label">Selecionar contrato</label>
+        <select
+          className="input"
+          value={selectedContrato?.id || ""}
+          onChange={(event) => selectContrato(event.target.value)}
+        >
+          <option value="">Selecione...</option>
+          {contratos.map((contrato) => (
+            <option key={contrato.id} value={contrato.id}>
+              {contrato.id}
+            </option>
+          ))}
+        </select>
         <button className="button" onClick={renderPreview} style={{ marginTop: 12 }}>
           Atualizar preview
         </button>
