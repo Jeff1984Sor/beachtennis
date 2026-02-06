@@ -11,7 +11,7 @@ from app.models.execucao_rotina import ExecucaoRotina
 from app.models.profissional import Profissional
 from app.models.unidade import Unidade
 from app.models.regra_comissao import RegraComissao
-from app.models.enums import AulaStatus, ContaStatus, ExecucaoStatus, ComissaoTipo
+from app.models.enums import AulaStatus, ContaStatus, ExecucaoStatus, ComissaoTipo, BaseCalculo
 
 
 def _parse_mes(mes: str) -> tuple[date, date]:
@@ -37,6 +37,9 @@ async def gerar_comissoes(session: AsyncSession, unidade_id: str, mes: str) -> i
     regra = regra_result.scalar_one_or_none()
     if not regra:
         raise api_error("regra_inexistente", "Regra de comissao nao encontrada", 404)
+
+    if regra.base_calculo != BaseCalculo.valor_cobrado_aula:
+        raise api_error("base_calculo_invalida", "Base de calculo nao suportada", 400)
 
     unidade_result = await session.execute(select(Unidade).where(Unidade.id == unidade_id))
     unidade = unidade_result.scalar_one_or_none()

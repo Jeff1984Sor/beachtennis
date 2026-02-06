@@ -8,6 +8,19 @@ from app.schemas.profissional import ProfissionalOut, ProfissionalCreate, Profis
 from app.schemas.contrato import ContratoOut, ContratoCreate, ContratoUpdate
 from app.schemas.regra_comissao import RegraComissaoOut, RegraComissaoCreate, RegraComissaoUpdate
 from app.schemas.financeiro import DREOut
+from app.schemas.agenda import (
+    AgendaOut,
+    AgendaCreate,
+    AgendaUpdate,
+    DisponibilidadeAgendaOut,
+    DisponibilidadeAgendaCreate,
+    DisponibilidadeOverrideOut,
+    DisponibilidadeOverrideCreate,
+    BloqueioAgendaOut,
+    BloqueioAgendaCreate,
+    AulaOut,
+    AulaCreate,
+)
 
 __all__ = [
     "TokenPair",
@@ -36,4 +49,15 @@ __all__ = [
     "RegraComissaoCreate",
     "RegraComissaoUpdate",
     "DREOut",
+    "AgendaOut",
+    "AgendaCreate",
+    "AgendaUpdate",
+    "DisponibilidadeAgendaOut",
+    "DisponibilidadeAgendaCreate",
+    "DisponibilidadeOverrideOut",
+    "DisponibilidadeOverrideCreate",
+    "BloqueioAgendaOut",
+    "BloqueioAgendaCreate",
+    "AulaOut",
+    "AulaCreate",
 ]

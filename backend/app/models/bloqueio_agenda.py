@@ -1,6 +1,6 @@
 from datetime import date, time
 
-from sqlalchemy import String, Enum, ForeignKey, Integer, Date, Time
+from sqlalchemy import String, Enum, ForeignKey, Integer, Date, Time, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, UUIDMixin, TimestampMixin
@@ -22,3 +22,4 @@ class BloqueioAgenda(UUIDMixin, TimestampMixin, Base):
     hora_fim: Mapped[time | None] = mapped_column(Time)
     data_inicio: Mapped[date | None] = mapped_column(Date)
     data_fim: Mapped[date | None] = mapped_column(Date)
+    ativo: Mapped[bool] = mapped_column(Boolean, default=True)

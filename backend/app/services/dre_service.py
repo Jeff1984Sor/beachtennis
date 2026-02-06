@@ -39,15 +39,26 @@ async def calcular_dre(session: AsyncSession, unidade_id: str, inicio: date, fim
     receitas_items = []
     despesas_items = []
 
+    categoria_ids_receita = [categoria_id for categoria_id, _ in receitas if categoria_id is not None]
+    categoria_ids_despesa = [categoria_id for categoria_id, _ in despesas if categoria_id is not None]
+    categoria_map = {}
+    if categoria_ids_receita or categoria_ids_despesa:
+        categorias = await session.execute(
+            select(CategoriaFinanceira).where(CategoriaFinanceira.id.in_(categoria_ids_receita + categoria_ids_despesa))
+        )
+        categoria_map = {str(cat.id): cat.nome for cat in categorias.scalars()}
+
     for categoria_id, total in receitas:
         if not total:
             continue
-        receitas_items.append({"categoria": str(categoria_id), "valor": float(total)})
+        nome = categoria_map.get(str(categoria_id), str(categoria_id))
+        receitas_items.append({"categoria": nome, "valor": float(total)})
 
     for categoria_id, total in despesas:
         if not total:
             continue
-        despesas_items.append({"categoria": str(categoria_id), "valor": float(total)})
+        nome = categoria_map.get(str(categoria_id), str(categoria_id))
+        despesas_items.append({"categoria": nome, "valor": float(total)})
 
     aulas_realizadas = await session.execute(
         select(func.count(Aula.id))
@@ -68,13 +79,9 @@ async def calcular_dre(session: AsyncSession, unidade_id: str, inicio: date, fim
     total_despesas = sum(item["valor"] for item in despesas_items)
 
     comissao_total = 0
-    if despesas_items:
-        categoria_ids = [categoria_id for categoria_id, _ in despesas if categoria_id is not None]
-        categorias = await session.execute(select(CategoriaFinanceira).where(CategoriaFinanceira.id.in_(categoria_ids)))
-        categoria_map = {str(cat.id): cat.nome for cat in categorias.scalars()}
-        for item in despesas_items:
-            if categoria_map.get(item["categoria"], "").lower() == "comissões" or categoria_map.get(item["categoria"], "").lower() == "comissoes":
-                comissao_total += item["valor"]
+    for item in despesas_items:
+        if item["categoria"].lower() in ("comissoes", "comissões"):
+            comissao_total += item["valor"]
 
     resultado = total_receitas - (total_despesas + custo_operacional)
 
