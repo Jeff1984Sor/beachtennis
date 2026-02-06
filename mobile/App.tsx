@@ -39,6 +39,7 @@ const START_HOUR = 6;
 const END_HOUR = 22;
 const ROW_HEIGHT = 48;
 const MINUTES_PER_PIXEL = 60 / ROW_HEIGHT;
+const DAY_COL_WIDTH = 120;
 
 const startOfWeek = (date: Date) => {
   const d = new Date(date);
@@ -90,6 +91,13 @@ const cleanupOldCache = async (keepWeeks = 8) => {
   }
 };
 
+const formatTime = (iso: string) => {
+  const d = new Date(iso);
+  const h = d.getHours().toString().padStart(2, "0");
+  const m = d.getMinutes().toString().padStart(2, "0");
+  return `${h}:${m}`;
+};
+
 export default function App() {
   const [branding, setBranding] = useState<Branding | null>(null);
   const [email, setEmail] = useState("admin@local");
@@ -100,6 +108,7 @@ export default function App() {
   const [weekStart, setWeekStart] = useState<Date>(startOfWeek(new Date()));
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const dragY = useRef(new Animated.Value(0)).current;
+  const dragX = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     fetch("http://localhost:8000/public/branding")
@@ -243,15 +252,19 @@ export default function App() {
       onPanResponderGrant: () => {
         setDraggingId(aula.id);
         dragY.setValue(0);
+        dragX.setValue(0);
       },
       onPanResponderMove: (_, gesture) => {
         dragY.setValue(gesture.dy);
+        dragX.setValue(gesture.dx);
       },
       onPanResponderRelease: (_, gesture) => {
-        const minutesDelta = Math.round(gesture.dy * MINUTES_PER_PIXEL / 15) * 15;
+        const minutesDelta = Math.round((gesture.dy * MINUTES_PER_PIXEL) / 15) * 15;
+        const daysDelta = Math.round(gesture.dx / DAY_COL_WIDTH);
         const inicioAtual = new Date(aula.inicio);
-        const novoInicio = new Date(inicioAtual.getTime() + minutesDelta * 60000);
+        const novoInicio = new Date(inicioAtual.getTime() + minutesDelta * 60000 + daysDelta * 86400000);
         dragY.setValue(0);
+        dragX.setValue(0);
         setDraggingId(null);
         updateAula(aula, novoInicio);
       }
@@ -343,11 +356,14 @@ export default function App() {
                         style={[
                           styles.aulaBlock,
                           { top: aula.top, height: aula.height },
-                          isDragging && { transform: [{ translateY: dragY }] }
+                          isDragging && { transform: [{ translateY: dragY }, { translateX: dragX }] }
                         ]}
                         {...responder.panHandlers}
                       >
                         <Text style={styles.aulaText}>{aula.status}</Text>
+                        <Text style={styles.aulaTime}>
+                          {formatTime(aula.inicio)} - {formatTime(aula.fim)}
+                        </Text>
                       </Animated.View>
                     );
                   })}
@@ -451,11 +467,11 @@ const styles = StyleSheet.create({
     width: 56
   },
   dayHeaderCell: {
-    width: 120,
+    width: DAY_COL_WIDTH,
     alignItems: "center"
   },
   dayColumn: {
-    width: 120,
+    width: DAY_COL_WIDTH,
     height: (END_HOUR - START_HOUR) * ROW_HEIGHT,
     position: "relative",
     borderLeftWidth: 1,
@@ -480,6 +496,10 @@ const styles = StyleSheet.create({
   aulaText: {
     fontSize: 12,
     fontWeight: "600"
+  },
+  aulaTime: {
+    fontSize: 11,
+    color: "#5a4f40"
   },
   muted: {
     color: "#6b6a65"

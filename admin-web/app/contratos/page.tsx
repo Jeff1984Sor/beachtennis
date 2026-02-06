@@ -2,7 +2,7 @@
 
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getToken } from "../lib/auth";
 
@@ -26,6 +26,12 @@ const variaveis = [
   "empresa.nome_empresa"
 ];
 
+const highlight = (text: string, term: string) => {
+  if (!term) return text;
+  const regex = new RegExp(`(${term})`, "gi");
+  return text.replace(regex, "<mark>$1</mark>");
+};
+
 export default function ContratosPage() {
   const router = useRouter();
   const editor = useEditor({
@@ -36,6 +42,7 @@ export default function ContratosPage() {
   const [contratos, setContratos] = useState<Contrato[]>([]);
   const [selectedContrato, setSelectedContrato] = useState<Contrato | null>(null);
   const [search, setSearch] = useState("");
+  const [debounced, setDebounced] = useState("");
 
   const fetchContratos = async (value: string) => {
     const token = getToken();
@@ -59,6 +66,17 @@ export default function ContratosPage() {
     }
     fetchContratos("");
   }, [router]);
+
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setDebounced(search);
+    }, 350);
+    return () => clearTimeout(handle);
+  }, [search]);
+
+  useEffect(() => {
+    fetchContratos(debounced);
+  }, [debounced]);
 
   const insertVar = (value: string) => {
     editor?.chain().focus().insertContent(`{{ ${value} }}`).run();
@@ -94,6 +112,8 @@ export default function ContratosPage() {
     setPreviewHtml(data.rendered_html || "");
   };
 
+  const results = useMemo(() => contratos.slice(0, 10), [contratos]);
+
   return (
     <div className="grid grid-2">
       <div className="card">
@@ -103,13 +123,32 @@ export default function ContratosPage() {
         <input
           className="input"
           value={search}
-          onChange={(event) => {
-            const value = event.target.value;
-            setSearch(value);
-            fetchContratos(value);
-          }}
+          onChange={(event) => setSearch(event.target.value)}
           placeholder="Nome do aluno ou ID"
         />
+        {search && (
+          <div className="card" style={{ marginTop: 12 }}>
+            {results.length === 0 ? (
+              <p>Nenhum resultado.</p>
+            ) : (
+              results.map((contrato) => (
+                <button
+                  key={contrato.id}
+                  className="button"
+                  onClick={() => selectContrato(contrato.id)}
+                  dangerouslySetInnerHTML={{
+                    __html: highlight(
+                      contrato.aluno_nome
+                        ? `${contrato.aluno_nome} - ${contrato.id}`
+                        : contrato.id,
+                      debounced
+                    )
+                  }}
+                />
+              ))
+            )}
+          </div>
+        )}
         <label className="label">Selecionar contrato</label>
         <select
           className="input"
@@ -123,9 +162,7 @@ export default function ContratosPage() {
             </option>
           ))}
         </select>
-        {selectedContrato?.aluno_nome ? (
-          <p>Aluno: {selectedContrato.aluno_nome}</p>
-        ) : null}
+        {selectedContrato?.aluno_nome ? <p>Aluno: {selectedContrato.aluno_nome}</p> : null}
         <button className="button" onClick={renderPreview} style={{ marginTop: 12 }}>
           Atualizar preview
         </button>
