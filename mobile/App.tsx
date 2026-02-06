@@ -1,7 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import {
+  StyleSheet,
+  Text,
+  View,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  PanResponder,
+  Animated
+} from "react-native";
 import { StatusBar } from "expo-status-bar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -21,13 +30,15 @@ type Aula = {
   status: string;
 };
 
+type AulaLayout = Aula & { top: number; height: number };
+
 const diasSemana = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
-const horas = Array.from({ length: 16 }, (_, i) => 6 + i);
 const TOKEN_KEY = "bt_mobile_token";
 const CACHE_PREFIX = "bt_agenda_week_";
 const START_HOUR = 6;
 const END_HOUR = 22;
 const ROW_HEIGHT = 48;
+const MINUTES_PER_PIXEL = 60 / ROW_HEIGHT;
 
 const startOfWeek = (date: Date) => {
   const d = new Date(date);
@@ -65,6 +76,20 @@ const saveWeekCache = async (weekStart: Date, data: Aula[]) => {
   await AsyncStorage.setItem(weekKey(weekStart), JSON.stringify(data));
 };
 
+const cleanupOldCache = async (keepWeeks = 8) => {
+  const keys = await AsyncStorage.getAllKeys();
+  const agendaKeys = keys.filter((key) => key.startsWith(CACHE_PREFIX));
+  const now = new Date();
+  for (const key of agendaKeys) {
+    const dateStr = key.replace(CACHE_PREFIX, "");
+    const cachedDate = new Date(dateStr);
+    const diffWeeks = (now.getTime() - cachedDate.getTime()) / (7 * 24 * 60 * 60 * 1000);
+    if (diffWeeks > keepWeeks) {
+      await AsyncStorage.removeItem(key);
+    }
+  }
+};
+
 export default function App() {
   const [branding, setBranding] = useState<Branding | null>(null);
   const [email, setEmail] = useState("admin@local");
@@ -73,6 +98,8 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [aulas, setAulas] = useState<Aula[]>([]);
   const [weekStart, setWeekStart] = useState<Date>(startOfWeek(new Date()));
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const dragY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     fetch("http://localhost:8000/public/branding")
@@ -85,6 +112,7 @@ export default function App() {
     loadToken().then((stored) => {
       if (stored) setToken(stored);
     });
+    cleanupOldCache();
   }, []);
 
   useEffect(() => {
@@ -171,7 +199,7 @@ export default function App() {
   const aulasPorDia = (dayIndex: number) =>
     aulas.filter((aula) => new Date(aula.inicio).getDay() === dayIndex);
 
-  const aulasDoDia = (dayIndex: number) => {
+  const aulasDoDia = (dayIndex: number): AulaLayout[] => {
     const dia = aulasPorDia(dayIndex);
     return dia.map((aula) => {
       const inicio = new Date(aula.inicio);
@@ -183,6 +211,51 @@ export default function App() {
       return { ...aula, top, height };
     });
   };
+
+  const updateAula = async (aula: Aula, newStart: Date) => {
+    if (!token) return;
+    const durationMs = new Date(aula.fim).getTime() - new Date(aula.inicio).getTime();
+    const newEnd = new Date(newStart.getTime() + durationMs);
+
+    const res = await fetch(`http://localhost:8000/agenda/aulas/${aula.id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token.access_token}`
+      },
+      body: JSON.stringify({ inicio: newStart.toISOString(), fim: newEnd.toISOString() })
+    });
+
+    if (!res.ok) {
+      setError("Erro ao reagendar aula");
+      return;
+    }
+
+    const updated = (await res.json()) as Aula;
+    const next = aulas.map((item) => (item.id === updated.id ? updated : item));
+    setAulas(next);
+    await saveWeekCache(weekStart, next);
+  };
+
+  const createPanResponder = (aula: Aula) =>
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        setDraggingId(aula.id);
+        dragY.setValue(0);
+      },
+      onPanResponderMove: (_, gesture) => {
+        dragY.setValue(gesture.dy);
+      },
+      onPanResponderRelease: (_, gesture) => {
+        const minutesDelta = Math.round(gesture.dy * MINUTES_PER_PIXEL / 15) * 15;
+        const inicioAtual = new Date(aula.inicio);
+        const novoInicio = new Date(inicioAtual.getTime() + minutesDelta * 60000);
+        dragY.setValue(0);
+        setDraggingId(null);
+        updateAula(aula, novoInicio);
+      }
+    });
 
   const logout = async () => {
     setToken(null);
@@ -250,25 +323,34 @@ export default function App() {
             </View>
             <View style={styles.gridBody}>
               <View style={styles.timeColumn}>
-                {horas.map((hour) => (
-                  <View key={hour} style={styles.timeRow}>
-                    <Text style={styles.muted}>{`${hour}:00`}</Text>
+                {Array.from({ length: END_HOUR - START_HOUR }).map((_, idx) => (
+                  <View key={idx} style={styles.timeRow}>
+                    <Text style={styles.muted}>{`${START_HOUR + idx}:00`}</Text>
                   </View>
                 ))}
               </View>
               {diasSemana.map((_, dayIdx) => (
                 <View key={dayIdx} style={styles.dayColumn}>
-                  {horas.map((hour) => (
-                    <View key={`${dayIdx}-${hour}`} style={styles.gridRowLine} />
+                  {Array.from({ length: END_HOUR - START_HOUR }).map((_, idx) => (
+                    <View key={`${dayIdx}-${idx}`} style={styles.gridRowLine} />
                   ))}
-                  {aulasDoDia(dayIdx).map((aula) => (
-                    <View
-                      key={aula.id}
-                      style={[styles.aulaBlock, { top: aula.top, height: aula.height }]}
-                    >
-                      <Text style={styles.aulaText}>{aula.status}</Text>
-                    </View>
-                  ))}
+                  {aulasDoDia(dayIdx).map((aula) => {
+                    const responder = createPanResponder(aula);
+                    const isDragging = draggingId === aula.id;
+                    return (
+                      <Animated.View
+                        key={aula.id}
+                        style={[
+                          styles.aulaBlock,
+                          { top: aula.top, height: aula.height },
+                          isDragging && { transform: [{ translateY: dragY }] }
+                        ]}
+                        {...responder.panHandlers}
+                      >
+                        <Text style={styles.aulaText}>{aula.status}</Text>
+                      </Animated.View>
+                    );
+                  })}
                 </View>
               ))}
             </View>

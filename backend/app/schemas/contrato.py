@@ -46,3 +46,7 @@ class ContratoUpdate(BaseModel):
 
 class ContratoOut(UUIDModel, Timestamped, ContratoBase):
     pass
+
+
+class ContratoListOut(UUIDModel, ContratoBase):
+    aluno_nome: str | None = None

@@ -11,6 +11,7 @@ type Contrato = {
   aluno_id: string;
   unidade_id: string;
   plano_id: string;
+  aluno_nome?: string | null;
 };
 
 const variaveis = [
@@ -39,7 +40,9 @@ export default function ContratosPage() {
   const fetchContratos = async (value: string) => {
     const token = getToken();
     if (!token) return;
-    const url = value ? `http://localhost:8000/contratos?search=${encodeURIComponent(value)}` : "http://localhost:8000/contratos";
+    const url = value
+      ? `http://localhost:8000/contratos?search=${encodeURIComponent(value)}`
+      : "http://localhost:8000/contratos";
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${token}` }
     });
@@ -69,7 +72,8 @@ export default function ContratosPage() {
     });
     if (!res.ok) return;
     const data = (await res.json()) as Contrato;
-    setSelectedContrato(data);
+    const match = contratos.find((item) => item.id === id);
+    setSelectedContrato({ ...data, aluno_nome: match?.aluno_nome });
   };
 
   const renderPreview = async () => {
@@ -115,10 +119,13 @@ export default function ContratosPage() {
           <option value="">Selecione...</option>
           {contratos.map((contrato) => (
             <option key={contrato.id} value={contrato.id}>
-              {contrato.id}
+              {contrato.aluno_nome ? `${contrato.aluno_nome} - ${contrato.id}` : contrato.id}
             </option>
           ))}
         </select>
+        {selectedContrato?.aluno_nome ? (
+          <p>Aluno: {selectedContrato.aluno_nome}</p>
+        ) : null}
         <button className="button" onClick={renderPreview} style={{ marginTop: 12 }}>
           Atualizar preview
         </button>

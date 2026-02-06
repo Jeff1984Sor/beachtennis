@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, cast, String
 
 from app.core.database import get_session
 from app.core.deps import get_current_user
 from app.core.errors import api_error
-from app.schemas.contrato import ContratoOut, ContratoCreate, ContratoUpdate
+from app.schemas.contrato import ContratoOut, ContratoCreate, ContratoUpdate, ContratoListOut
 from app.models.contrato import Contrato
 from app.models.aluno import Aluno
 from app.services.contrato_template_service import render_template, build_context
@@ -27,22 +27,23 @@ class PreviewResponse(BaseModel):
     rendered_html: str
 
 
-@router.get("", response_model=list[ContratoOut])
+@router.get("", response_model=list[ContratoListOut])
 async def listar(
     search: str | None = None,
     session: AsyncSession = Depends(get_session),
     user=Depends(get_current_user),
-) -> list[ContratoOut]:
-    query = select(Contrato)
+) -> list[ContratoListOut]:
+    query = select(Contrato, Aluno.nome).join(Aluno, Aluno.id == Contrato.aluno_id)
     if search:
         pattern = f"%{search}%"
-        query = (
-            select(Contrato)
-            .join(Aluno, Aluno.id == Contrato.aluno_id)
-            .where(or_(Aluno.nome.ilike(pattern), Contrato.id.cast(str).ilike(pattern)))
-        )
+        query = query.where(or_(Aluno.nome.ilike(pattern), cast(Contrato.id, String).ilike(pattern)))
     result = await session.execute(query)
-    return [ContratoOut.model_validate(c) for c in result.scalars()]
+    items = []
+    for contrato, aluno_nome in result.all():
+        base = ContratoListOut.model_validate(contrato).model_dump()
+        base["aluno_nome"] = aluno_nome
+        items.append(ContratoListOut(**base))
+    return items
 
 
 @router.get("/{contrato_id}", response_model=ContratoOut)
