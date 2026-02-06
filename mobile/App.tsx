@@ -24,6 +24,10 @@ type Aula = {
 const diasSemana = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
 const horas = Array.from({ length: 16 }, (_, i) => 6 + i);
 const TOKEN_KEY = "bt_mobile_token";
+const CACHE_PREFIX = "bt_agenda_week_";
+const START_HOUR = 6;
+const END_HOUR = 22;
+const ROW_HEIGHT = 48;
 
 const startOfWeek = (date: Date) => {
   const d = new Date(date);
@@ -50,6 +54,17 @@ const clearToken = async () => {
   await AsyncStorage.removeItem(TOKEN_KEY);
 };
 
+const weekKey = (weekStart: Date) => `${CACHE_PREFIX}${weekStart.toISOString().slice(0, 10)}`;
+
+const loadWeekCache = async (weekStart: Date) => {
+  const raw = await AsyncStorage.getItem(weekKey(weekStart));
+  return raw ? (JSON.parse(raw) as Aula[]) : null;
+};
+
+const saveWeekCache = async (weekStart: Date, data: Aula[]) => {
+  await AsyncStorage.setItem(weekKey(weekStart), JSON.stringify(data));
+};
+
 export default function App() {
   const [branding, setBranding] = useState<Branding | null>(null);
   const [email, setEmail] = useState("admin@local");
@@ -71,6 +86,12 @@ export default function App() {
       if (stored) setToken(stored);
     });
   }, []);
+
+  useEffect(() => {
+    loadWeekCache(weekStart).then((cached) => {
+      if (cached) setAulas(cached);
+    });
+  }, [weekStart]);
 
   const handleLogin = async () => {
     setError(null);
@@ -137,6 +158,7 @@ export default function App() {
     }
     const data = (await res.json()) as Aula[];
     setAulas(data);
+    await saveWeekCache(baseDate, data);
   };
 
   const changeWeek = (delta: number) => {
@@ -149,8 +171,18 @@ export default function App() {
   const aulasPorDia = (dayIndex: number) =>
     aulas.filter((aula) => new Date(aula.inicio).getDay() === dayIndex);
 
-  const aulasPorDiaHora = (dayIndex: number, hour: number) =>
-    aulasPorDia(dayIndex).filter((aula) => new Date(aula.inicio).getHours() === hour);
+  const aulasDoDia = (dayIndex: number) => {
+    const dia = aulasPorDia(dayIndex);
+    return dia.map((aula) => {
+      const inicio = new Date(aula.inicio);
+      const fim = new Date(aula.fim);
+      const startMin = (inicio.getHours() - START_HOUR) * 60 + inicio.getMinutes();
+      const endMin = (fim.getHours() - START_HOUR) * 60 + fim.getMinutes();
+      const top = Math.max(0, (startMin / 60) * ROW_HEIGHT);
+      const height = Math.max(24, ((endMin - startMin) / 60) * ROW_HEIGHT);
+      return { ...aula, top, height };
+    });
+  };
 
   const logout = async () => {
     setToken(null);
@@ -206,37 +238,42 @@ export default function App() {
           <Text style={styles.buttonText}>Atualizar</Text>
         </TouchableOpacity>
 
-        <View style={styles.gridHeader}>
-          <View style={styles.timeCell} />
-          {diasSemana.map((dia) => (
-            <View key={dia} style={styles.dayHeaderCell}>
-              <Text style={styles.dayTitle}>{dia}</Text>
-            </View>
-          ))}
-        </View>
-        {horas.map((hour) => (
-          <View key={hour} style={styles.gridRow}>
-            <View style={styles.timeCell}>
-              <Text style={styles.muted}>{`${hour}:00`}</Text>
-            </View>
-            {diasSemana.map((_, dayIdx) => {
-              const itens = aulasPorDiaHora(dayIdx, hour);
-              return (
-                <View key={`${dayIdx}-${hour}`} style={styles.gridCell}>
-                  {itens.length === 0 ? (
-                    <Text style={styles.muted}>-</Text>
-                  ) : (
-                    itens.map((aula) => (
-                      <Text key={aula.id} style={styles.gridItem}>
-                        {aula.status}
-                      </Text>
-                    ))
-                  )}
+        <ScrollView horizontal>
+          <View>
+            <View style={styles.gridHeader}>
+              <View style={styles.timeCell} />
+              {diasSemana.map((dia) => (
+                <View key={dia} style={styles.dayHeaderCell}>
+                  <Text style={styles.dayTitle}>{dia}</Text>
                 </View>
-              );
-            })}
+              ))}
+            </View>
+            <View style={styles.gridBody}>
+              <View style={styles.timeColumn}>
+                {horas.map((hour) => (
+                  <View key={hour} style={styles.timeRow}>
+                    <Text style={styles.muted}>{`${hour}:00`}</Text>
+                  </View>
+                ))}
+              </View>
+              {diasSemana.map((_, dayIdx) => (
+                <View key={dayIdx} style={styles.dayColumn}>
+                  {horas.map((hour) => (
+                    <View key={`${dayIdx}-${hour}`} style={styles.gridRowLine} />
+                  ))}
+                  {aulasDoDia(dayIdx).map((aula) => (
+                    <View
+                      key={aula.id}
+                      style={[styles.aulaBlock, { top: aula.top, height: aula.height }]}
+                    >
+                      <Text style={styles.aulaText}>{aula.status}</Text>
+                    </View>
+                  ))}
+                </View>
+              ))}
+            </View>
           </View>
-        ))}
+        </ScrollView>
       </View>
 
       <StatusBar style="dark" />
@@ -313,41 +350,54 @@ const styles = StyleSheet.create({
   },
   gridHeader: {
     flexDirection: "row",
+    paddingBottom: 6,
     borderBottomWidth: 1,
-    borderColor: "#e0d4c0",
-    paddingBottom: 4
+    borderColor: "#e0d4c0"
   },
-  gridRow: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderColor: "#f0e5d3",
-    paddingVertical: 2
+  gridBody: {
+    flexDirection: "row"
   },
-  timeCell: {
-    width: 54,
-    alignItems: "center",
-    justifyContent: "center"
+  timeColumn: {
+    width: 56
   },
-  dayHeaderCell: {
-    flex: 1,
+  timeRow: {
+    height: ROW_HEIGHT,
+    justifyContent: "center",
     alignItems: "center"
   },
-  gridCell: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 6
+  timeCell: {
+    width: 56
+  },
+  dayHeaderCell: {
+    width: 120,
+    alignItems: "center"
+  },
+  dayColumn: {
+    width: 120,
+    height: (END_HOUR - START_HOUR) * ROW_HEIGHT,
+    position: "relative",
+    borderLeftWidth: 1,
+    borderColor: "#f0e5d3"
+  },
+  gridRowLine: {
+    height: ROW_HEIGHT,
+    borderBottomWidth: 1,
+    borderColor: "#f0e5d3"
   },
   dayTitle: {
-    fontWeight: "600",
-    marginBottom: 4
+    fontWeight: "600"
   },
-  gridItem: {
-    fontSize: 12,
+  aulaBlock: {
+    position: "absolute",
+    left: 6,
+    right: 6,
     backgroundColor: "#ffe3c2",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6
+    borderRadius: 8,
+    padding: 4
+  },
+  aulaText: {
+    fontSize: 12,
+    fontWeight: "600"
   },
   muted: {
     color: "#6b6a65"

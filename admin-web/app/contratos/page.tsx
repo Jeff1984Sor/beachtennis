@@ -34,6 +34,19 @@ export default function ContratosPage() {
   const [previewHtml, setPreviewHtml] = useState<string>("");
   const [contratos, setContratos] = useState<Contrato[]>([]);
   const [selectedContrato, setSelectedContrato] = useState<Contrato | null>(null);
+  const [search, setSearch] = useState("");
+
+  const fetchContratos = async (value: string) => {
+    const token = getToken();
+    if (!token) return;
+    const url = value ? `http://localhost:8000/contratos?search=${encodeURIComponent(value)}` : "http://localhost:8000/contratos";
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) return;
+    const data = (await res.json()) as Contrato[];
+    setContratos(data);
+  };
 
   useEffect(() => {
     const token = getToken();
@@ -41,12 +54,7 @@ export default function ContratosPage() {
       router.push("/login");
       return;
     }
-    fetch("http://localhost:8000/contratos", {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-      .then((res) => res.json())
-      .then((data) => setContratos(data))
-      .catch(() => setContratos([]));
+    fetchContratos("");
   }, [router]);
 
   const insertVar = (value: string) => {
@@ -87,6 +95,17 @@ export default function ContratosPage() {
       <div className="card">
         <div className="label">Editor</div>
         <EditorContent editor={editor} />
+        <label className="label">Buscar contrato/aluno</label>
+        <input
+          className="input"
+          value={search}
+          onChange={(event) => {
+            const value = event.target.value;
+            setSearch(value);
+            fetchContratos(value);
+          }}
+          placeholder="Nome do aluno ou ID"
+        />
         <label className="label">Selecionar contrato</label>
         <select
           className="input"

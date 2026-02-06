@@ -1,13 +1,14 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, or_
 
 from app.core.database import get_session
 from app.core.deps import get_current_user
 from app.core.errors import api_error
 from app.schemas.contrato import ContratoOut, ContratoCreate, ContratoUpdate
 from app.models.contrato import Contrato
+from app.models.aluno import Aluno
 from app.services.contrato_template_service import render_template, build_context
 
 router = APIRouter(prefix="/contratos")
@@ -28,10 +29,19 @@ class PreviewResponse(BaseModel):
 
 @router.get("", response_model=list[ContratoOut])
 async def listar(
+    search: str | None = None,
     session: AsyncSession = Depends(get_session),
     user=Depends(get_current_user),
 ) -> list[ContratoOut]:
-    result = await session.execute(select(Contrato))
+    query = select(Contrato)
+    if search:
+        pattern = f"%{search}%"
+        query = (
+            select(Contrato)
+            .join(Aluno, Aluno.id == Contrato.aluno_id)
+            .where(or_(Aluno.nome.ilike(pattern), Contrato.id.cast(str).ilike(pattern)))
+        )
+    result = await session.execute(query)
     return [ContratoOut.model_validate(c) for c in result.scalars()]
 
 
