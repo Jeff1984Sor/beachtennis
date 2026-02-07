@@ -1,14 +1,19 @@
 {
   "expo": {
-    "name": "Beach Tennis",
-    "slug": "beach-tennis",
-    "version": "0.1.0",
+    "name": "Beach Tennis Mobile",
+    "slug": "beach-tennis-mobile",
+    "version": "1.0.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "light",
+    "scheme": "beachtennis",
+    "userInterfaceStyle": "automatic",
     "splash": {
       "resizeMode": "contain",
-      "backgroundColor": "#f7f3ea"
+      "backgroundColor": "#0C4A6E"
     },
-    "assetBundlePatterns": ["**/*"]
+    "assetBundlePatterns": ["**/*"],
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    }
   }
 }

@@ -1,89 +1,83 @@
 # Beach Tennis School
 
-Repositório completo para gestão de uma escola de Beach Tennis: FastAPI + Postgres, Admin Web (Next.js) e Mobile (Expo).
+Projeto completo para gestão de escola de Beach Tennis com backend FastAPI + Postgres e app mobile único (Expo) com experiência por perfil: gestor, professor e aluno.
 
-## Stack
-- Backend: FastAPI, SQLAlchemy 2.0 async, Alembic, Pydantic v2
-- DB: Postgres
-- Frontend Admin: Next.js + TypeScript
-- Mobile: React Native (Expo) + TypeScript
+## Estrutura
+- `backend/`: API FastAPI (auth JWT, agenda, alunos, comissões, contratos, mídia, DRE)
+- `mobile/`: app React Native (Expo Router + React Query + RHF + Zod)
+- `docker-compose.yml`: Postgres + backend
 
-## Como rodar (backend)
+## Subir backend com Docker
 ```bash
-cd backend
-python -m venv .venv
-.venv/Scripts/activate
-pip install -r requirements.txt
-```
-
-Crie `.env` a partir de `.env.example`.
-
-Rodar com Docker Compose:
-```bash
-cd ..
+cd C:\Users\JeffersonFernandes\Projetos\Beachetenis_final
 docker compose up --build
 ```
 
-### Migrations
-```bash
-cd backend
-alembic revision --autogenerate -m "init"
-alembic upgrade head
-```
+Backend em `http://localhost:8000`.
 
-### Seeds
+## Rodar migrações e seeds
 ```bash
 cd backend
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+alembic upgrade head
 python -m app.seeds.seed
 ```
 
-Credenciais padrão:
-- email: `admin@local`
-- senha: `admin123`
-
-## Admin Web
-```bash
-cd admin-web
-npm install
-npm run dev
-```
-
-A UI já consome `/public/branding`.
-
-## Mobile (Expo)
+## Rodar app mobile
 ```bash
 cd mobile
 npm install
 npm run start
 ```
 
-## Endpoints principais
+Defina a API no Expo se necessário:
+```bash
+set EXPO_PUBLIC_API_URL=http://localhost:8000
+```
+
+## Usuários seed
+- Gestor
+- email: `gestor@local`
+- senha: `gestor123`
+
+- Professor
+- email: `professor@local`
+- senha: `professor123`
+
+- Aluno
+- email: `aluno@local`
+- senha: `aluno123`
+
+## Fluxos do app mobile
+1. Login único com branding público (`/public/branding`).
+2. Após login o app chama `/auth/me`, identifica papéis e monta abas por perfil.
+3. Menu "Trocar visão" permite alternar entre papéis disponíveis no mesmo usuário.
+4. Agenda do dia com cards, filtros e ações rápidas (confirmar, realizada, cancelar).
+5. Alunos com ficha completa: Aulas, Financeiro, WhatsApp, Contrato e Anexos (upload + abrir).
+6. Financeiro:
+- gestor: receber/pagar
+- professor: comissões (visão pagar)
+- aluno: receber próprio
+7. Configurações gestor: geração de comissão do mês anterior e busca CEP.
+
+## Endpoints usados no mobile
 - `POST /auth/login`
 - `POST /auth/refresh`
+- `GET /auth/me`
 - `GET /public/branding`
-- `GET /public/logo`
-- `GET /utils/cep/{cep}`
-- `POST /media/upload`
-- `GET /media/{id}`
-- `DELETE /media/{id}`
-- `CRUD /alunos`
-- `GET /alunos/{id}/ficha`
+- `GET /mobile/agenda-dia`
+- `GET /mobile/alunos`
+- `GET /mobile/alunos/{id}/ficha`
+- `GET /mobile/financeiro`
 - `GET /alunos/{id}/anexos`
 - `POST /alunos/{id}/anexos/upload`
-- `CRUD /unidades`
-- `CRUD /planos`
-- `CRUD /profissionais`
-- `CRUD /contratos`
-- `CRUD /regras-comissao`
-- `POST /comissoes/gerar?unidade_id=&mes=YYYY-MM`
-- `GET /financeiro/dre?unidade_id=&inicio=YYYY-MM-DD&fim=YYYY-MM-DD&modo=caixa|competencia`
+- `PUT /agenda/aulas/{id}`
+- `POST /comissoes/gerar`
+- `GET /utils/cep/{cep}`
+- `GET /financeiro/dre`
 
 ## Observações
-- Uploads ficam em `MEDIA_ROOT` por ano/mês e preservam extensão.
-- Branding e logo são públicos via endpoints.
-- RBAC via `PerfilAcesso.permissoes` (JSON).
-
-## Próximos passos
-- Completar validações de agenda e capacidade.
-- Implementar editor de contratos e variáveis no admin-web.
-- Implementar telas e autenticação no mobile.
+- Uploads são salvos em filesystem (`/media` no container).
+- O backend mantém endpoints existentes e adiciona camada `/mobile` para payloads otimizados para app.

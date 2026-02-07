@@ -12,6 +12,7 @@ from app.api.routes.contratos import router as contratos_router
 from app.api.routes.comissoes import router as comissoes_router
 from app.api.routes.dre import router as dre_router
 from app.api.routes.agenda import router as agenda_router
+from app.api.routes.mobile import router as mobile_router
 
 router = APIRouter()
 router.include_router(auth_router, tags=["auth"])
@@ -26,3 +27,4 @@ router.include_router(contratos_router, tags=["contratos"])
 router.include_router(comissoes_router, tags=["comissoes"])
 router.include_router(dre_router, tags=["dre"])
 router.include_router(agenda_router, tags=["agenda"])
+router.include_router(mobile_router, tags=["mobile"])
