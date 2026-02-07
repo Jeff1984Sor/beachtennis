@@ -12,4 +12,4 @@ class EmpresaConfig(UUIDMixin, TimestampMixin, Base):
     tema: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     fonte: Mapped[str | None] = mapped_column(String(120))
 
-    logo: Mapped["MediaFile" | None] = relationship("MediaFile", foreign_keys=[logo_media_id])
+    logo: Mapped["MediaFile | None"] = relationship("MediaFile", foreign_keys=[logo_media_id])

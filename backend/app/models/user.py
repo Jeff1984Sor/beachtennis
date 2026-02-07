@@ -18,4 +18,4 @@ class Usuario(UUIDMixin, TimestampMixin, Base):
     ativo: Mapped[bool] = mapped_column(Boolean, default=True)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=False))
 
-    perfil_acesso: Mapped["PerfilAcesso" | None] = relationship("PerfilAcesso")
+    perfil_acesso: Mapped["PerfilAcesso | None"] = relationship("PerfilAcesso")
